@@ -1,0 +1,4 @@
+rootProject.name = 'Hopper'
+
+include(":core")
+include(":example")
