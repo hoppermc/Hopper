@@ -8,7 +8,6 @@ import org.bukkit.enchantments.Enchantment
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.ItemMeta
 import java.util.*
-import java.util.function.Consumer
 
 class SerializedItem {
     private val name: String? = null
@@ -39,8 +38,6 @@ class SerializedItem {
             .name(name!!)
             .lore(lore)
         item.changeMeta { meta: ItemMeta -> meta.setCustomModelData(0) }
-        for (s in canDestroy) item.canDestroy(Material.matchMaterial(s))
-        for (s in canDestroy) item.canPlaceOn(Material.matchMaterial(s)!!)
         for (enchantment in enchantments) {
             val bukkit = Arrays.stream(Enchantment.values())
                 .filter { query: Enchantment ->

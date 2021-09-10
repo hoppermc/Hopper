@@ -1,10 +1,14 @@
 plugins {
-    id 'org.jetbrains.kotlin.jvm' version '1.5.21'
-    id 'org.jetbrains.kotlin.plugin.serialization' version '1.5.20'
+    id 'org.jetbrains.kotlin.jvm' version '1.5.30'
+    id 'org.jetbrains.kotlin.plugin.serialization' version '1.5.30'
     id 'com.github.johnrengelman.shadow' version '6.1.0'
     id 'java-library'
     id 'maven-publish'
 }
+
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
 
 repositories {
     mavenCentral()
@@ -33,29 +37,36 @@ repositories {
         name = 'paper'
         url = 'https://papermc.io/repo/repository/maven-public/'
     }
+    maven {
+        name = 'dmulloy2'
+        url = 'https://repo.dmulloy2.net/repository/public/'
+    }
     maven { url 'https://repo.mineinabyss.com/releases' }
 }
 
 shadowJar {
-    //I only use acf and connected resources from him so I'm just gonna shadow him as acf
-    relocate('co.aikar.commands', 'odysseus-libs.acf')
+
+
 }
 
 dependencies {
 
-    api 'org.quartz-scheduler:quartz:2.3.2'
     api 'org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.2.2'
     api 'org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.2.2'
-
-
     api 'com.google.guava:guava:30.1.1-jre'
-    api 'co.aikar:acf-paper:0.5.0-SNAPSHOT'
+    api 'org.quartz-scheduler:quartz:2.3.2'
 
     api 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.1-native-mt'
     api 'org.litote.kmongo:kmongo-coroutine:4.2.8'
 
+    api 'co.aikar:acf-paper:0.5.0-SNAPSHOT'
+    api 'com.elmakers.mine.bukkit:EffectLib:9.0'
+    implementation 'org.reflections:reflections:0.9.12'
+
     compileOnly 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
     compileOnly 'org.spigotmc:spigot:1.16.5-R0.1-SNAPSHOT'
+
+    compileOnly 'com.comphenix.protocol:ProtocolLib:4.7.0'
 
     testImplementation 'org.jetbrains.kotlin:kotlin-test:1.5.21'
 }
@@ -65,7 +76,7 @@ publishing {
         maven(MavenPublication) {
             groupId = 'dev.helight.hopper'
             artifactId = 'hopper-core'
-            version = '1.0.1'
+            version = '1.0.3'
 
             from components.java
         }

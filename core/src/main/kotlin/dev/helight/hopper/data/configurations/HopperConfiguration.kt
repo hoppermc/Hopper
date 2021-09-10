@@ -22,7 +22,11 @@ data class HopperConfiguration(
     @ConfigComment("changes whether or not the ecs system shall persist component data and the entity id counter")
     val persistEcs: Boolean = true,
 
+    @ConfigComment("enables or disables a backup job which saves the current ecs state every minute. " +
+            "Has no effect if 'persistEcs' is disabled.")
+    val backupJob: Boolean = true,
+
     @ConfigComment("changes how the ecs system will generate new ids. Available: [incremental, snowflake]")
-    val ecsEntityIdGenerationStrategy: String = "incremental",
+    val ecsEntityIdGenerationStrategy: String = "snowflake",
 
 )

@@ -11,8 +11,8 @@ import org.bukkit.inventory.meta.SkullMeta
 
 object PlayerExtensions {
 
-    fun Player.raycast(player: Player, precision: Int = 5, maxDepth: Int = 32, colluding: Boolean = true): Location =
-        Raycast.castColliderRaycast(player, precision, maxDepth, colluding)
+    fun Player.raycast(precision: Int = 5, maxDepth: Int = 32, colluding: Boolean = true): Location =
+        Raycast.castColliderRaycast(this, precision, maxDepth, colluding)
 
     val OfflinePlayer.headItem: ItemStack
         get() {
@@ -24,6 +24,5 @@ object PlayerExtensions {
             }
             return item.delegate()
         }
-
-
 }
+

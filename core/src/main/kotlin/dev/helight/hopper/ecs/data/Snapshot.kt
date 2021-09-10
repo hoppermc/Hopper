@@ -40,7 +40,6 @@ data class ExportedEntitySnapshot(
     val group: String,
     val data: List<String>
 ) {
-
     @ExperimentalUnsignedTypes
     companion object {
         fun fromExported(exported: ExportedEntity): ExportedEntitySnapshot {

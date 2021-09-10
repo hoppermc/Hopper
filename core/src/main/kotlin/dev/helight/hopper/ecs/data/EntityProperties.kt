@@ -1,20 +1,14 @@
 package dev.helight.hopper.ecs.data
 
-import dev.helight.hopper.api.Item
 import dev.helight.hopper.extensions.EntityExtensions.attributable
 import dev.helight.hopper.extensions.EntityExtensions.living
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
-import org.bukkit.Material
 import org.bukkit.attribute.Attribute
-import org.bukkit.enchantments.Enchantment
 import org.bukkit.entity.Entity
 import org.bukkit.entity.EntityType
-import org.bukkit.inventory.ItemStack
-import org.bukkit.inventory.meta.ItemMeta
-import java.util.*
 
 @Serializable
 @SerialName("mc:entity:properties")
@@ -38,7 +32,10 @@ data class EntityProperties(
     }
 
     fun applyOn(entity: Entity) {
-        if (customName != null) entity.customName = customName
+        if (customName != null) {
+            entity.customName = customName
+            entity.isCustomNameVisible = true
+        }
         if (health != null) {
             entity.attributable!!.getAttribute(Attribute.GENERIC_MAX_HEALTH)!!.baseValue = health
             entity.living!!.health = health
@@ -52,30 +49,3 @@ data class EntityProperties(
     }
 }
 
-@Serializable
-@SerialName("mc:item:properties")
-data class ItemProperties(
-    val material: String,
-    val amount: Int = 1,
-    val name: String?,
-    val lore: List<String>?,
-    val enchantments: Map<String, Int> = mutableMapOf(),
-    val indestructible: Boolean = false
-) {
-    fun construct(): ItemStack {
-        val item: Item = Item.builder(Material.matchMaterial(material)!!).amount(amount)
-        if (name != null) item.name(name)
-        if (lore != null) item.lore(lore)
-        item.changeMeta { meta: ItemMeta -> meta.setCustomModelData(0) }
-        for (enchantment in enchantments) {
-            val bukkit = Arrays.stream(Enchantment.values()).filter { query: Enchantment -> query.key.key.lowercase().endsWith(enchantment.key.toLowerCase()) }
-                .findFirst().orElse(Enchantment.LUCK)
-            item.enchant(bukkit, enchantment.value)
-        }
-        return item.delegate()
-    }
-
-    companion object {
-        fun parseFormString(content: String): ItemProperties = Json.decodeFromString(content)
-    }
-}

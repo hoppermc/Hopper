@@ -5,14 +5,10 @@ import com.google.gson.Gson
 import com.mojang.authlib.GameProfile
 import com.mojang.authlib.properties.Property
 import dev.helight.hopper.HopperSpigotHook
-import net.minecraft.server.v1_16_R3.NBTTagCompound
-import net.minecraft.server.v1_16_R3.NBTTagList
-import net.minecraft.server.v1_16_R3.NBTTagString
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.attribute.Attribute
 import org.bukkit.attribute.AttributeModifier
-import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftItemStack
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemFlag
@@ -24,7 +20,6 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
-import java.lang.IllegalArgumentException
 import java.lang.reflect.Field
 import java.util.*
 import java.util.function.Consumer
@@ -44,9 +39,7 @@ class Item : ForwardingObject {
 
     //Recommended Constructor for Kotlin Projects
     constructor(material: Material, amount: Int = 1, name: String? = null, vararg lore: String,
-                flags: Collection<ItemFlag>? = null, enchantments: Collection<Pair<Enchantment,Int>>? = null,
-
-                ) {
+                flags: Collection<ItemFlag>? = null, enchantments: Collection<Pair<Enchantment,Int>>? = null) {
         itemStack = ItemStack(material, amount)
         if (name != null) name(name)
         if (lore.isNotEmpty()) lore(lore.toList())
@@ -110,23 +103,7 @@ class Item : ForwardingObject {
         return this
     }
 
-    fun canPlaceOn(material: Material): Item {
-        editNMS { compound: NBTTagCompound ->
-            val attributes: NBTTagList = compound.getList("CanPlaceOn", 8)
-            attributes.add(NBTTagString.a("minecraft:" + material.name.toLowerCase()))
-            compound.set("CanPlaceOn", attributes)
-        }
-        return this
-    }
 
-    fun canDestroy(material: Material?): Item {
-        editNMS { compound: NBTTagCompound ->
-            val attributes: NBTTagList = compound.getList("CanDestroy", 8)
-            attributes.add(NBTTagString.a("minecraft:" + material!!.name.toLowerCase()))
-            compound.set("CanPlaceOn", attributes)
-        }
-        return this
-    }
 
     fun storeJson(o: Any): Item {
         val gson = Gson()
@@ -176,14 +153,6 @@ class Item : ForwardingObject {
             PersistentDataType.STRING)
     }
 
-    fun editNMS(function: Consumer<NBTTagCompound>): Item {
-        val stack: net.minecraft.server.v1_16_R3.ItemStack = CraftItemStack.asNMSCopy(itemStack)
-        val compound: NBTTagCompound = stack.orCreateTag
-        function.accept(compound)
-        stack.tag = compound
-        itemStack = CraftItemStack.asCraftMirror(stack)
-        return this
-    }
 
     fun changeMetaFun(function: Function<ItemMeta, ItemMeta>): Item {
         var itemMeta = itemStack!!.itemMeta!!

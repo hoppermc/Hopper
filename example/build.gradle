@@ -1,0 +1,32 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.5.30'
+    id 'org.jetbrains.kotlin.plugin.serialization' version '1.5.30'
+    id "org.jetbrains.kotlin.kapt" version "1.5.30"
+}
+
+group = 'dev.helight.hopper'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    implementation 'dev.helight.hopper:hopper-core:1.0.1'
+    kapt 'dev.helight.hopper:hopper-kapt:1.0.0'
+}
+
+kapt {
+    arguments {
+        arg("key", "value")
+    }
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = '1.8'
+}
+
+compileTestKotlin {
+    kotlinOptions.jvmTarget = '1.8'
+}

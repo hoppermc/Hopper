@@ -3,7 +3,13 @@ package dev.helight.hopper.ecs
 import dev.helight.hopper.*
 import dev.helight.hopper.ecs.data.ExportedEntitySnapshot
 
-@ExperimentalUnsignedTypes
+/**
+ * Wrapper around the exported entity triple for easier interaction
+ *
+ * Read operations return internal values unless stated otherwise in the name and docs
+ * Write operations update global associated data values unless started otherwise in the name or the docs
+ */
+@Suppress("EXPERIMENTAL_API_USAGE")
 @JvmInline
 value class ExportedEntityWrapper(
     val entity: ExportedEntity
@@ -12,6 +18,11 @@ value class ExportedEntityWrapper(
         val id = T::class.java.toKey()
         val index = entity.second.indexOf(id)
         return entity.third[index] as T
+    }
+
+    inline fun <reified T> has() : Boolean {
+        val id = T::class.java.toKey()
+        return entity.second.contains(id)
     }
 
     inline fun <reified T> set(value: Any?) {
@@ -41,5 +52,11 @@ value class ExportedEntityWrapper(
         }.toList()
 
     fun snapshot() = ExportedEntitySnapshot.fromExported(entity)
+
+    fun delete() {
+        ecs.deleteEntity(entityId)
+    }
+
+    fun buffer() = BufferedEntity(entity)
 
 }

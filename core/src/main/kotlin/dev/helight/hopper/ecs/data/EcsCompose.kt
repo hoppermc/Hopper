@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
 @SerialName("ecs:compose")
 data class EcsCompose(
     val name: String,
+    val entity: EntityProperties? = null,
     val components: List<EcsComposeEntry>
 ) {
 

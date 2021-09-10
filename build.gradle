@@ -1,8 +1,6 @@
 group = 'dev.helight.hopper'
 version = '1.0-SNAPSHOT'
 
-allprojects {
-    repositories {
-        mavenCentral()
-    }
+repositories {
+    mavenCentral()
 }

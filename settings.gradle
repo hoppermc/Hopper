@@ -1,4 +1,6 @@
 rootProject.name = 'Hopper'
 
 include(":core")
+include(":hopperkapt")
+include(":minigame")
 include(":example")

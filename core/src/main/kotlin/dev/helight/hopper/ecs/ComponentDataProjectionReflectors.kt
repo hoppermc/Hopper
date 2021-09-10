@@ -3,15 +3,6 @@ package dev.helight.hopper.ecs
 import dev.helight.hopper.*
 import java.lang.reflect.Field
 import java.lang.reflect.Parameter
-import kotlin.reflect.KClass
-
-@Target(AnnotationTarget.FIELD, AnnotationTarget.VALUE_PARAMETER)
-@Retention(AnnotationRetention.RUNTIME)
-annotation class HopperComponentId(val id: Int)
-
-@Target(AnnotationTarget.FIELD, AnnotationTarget.VALUE_PARAMETER)
-@Retention(AnnotationRetention.RUNTIME)
-annotation class HopperComponentClass(val clazz: KClass<*>)
 
 object ComponentDataProjectionReflectors {
     val projectors: MutableMap<Pair<Class<*>, ComponentGroup>, Projector<*>> = mutableMapOf()

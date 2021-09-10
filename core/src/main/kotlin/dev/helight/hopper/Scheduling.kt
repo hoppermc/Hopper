@@ -7,13 +7,14 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory
 
+// DEPRECATED DEPRECATED DEPRECATED //
+// DEPRECATED DEPRECATED DEPRECATED //
+// DEPRECATED DEPRECATED DEPRECATED //
+
 private val threadGroup = ThreadGroup("OdysseusScheduling")
 private val threadFactory = GroupedThreadFactory()
 private val threadPool = MoreExecutors.listeningDecorator(Executors.newCachedThreadPool(threadFactory))
 
-internal fun shutdownOdysseusThreads() {
-    threadGroup.interrupt()
-}
 
 fun Runnable.runAtLeastTrying(exceptionHandler: (Exception) -> Unit = {it.printStackTrace()}) {
     try {
@@ -51,7 +52,7 @@ fun synchronizeDecoupled(block: Runnable) {
 }
 
 @HopperDsl
-fun launch(block: Runnable) {
+fun decouple(block: Runnable) {
     threadPool.execute(block)
 }
 
@@ -103,7 +104,7 @@ fun suspendRepeatingTask(delay: Long = 0, period: Long, block: () -> Boolean) {
  *              execution will be discontinued in the next cycle
  */
 @HopperDsl
-fun launchRepeatingTask(delay: Long = 0, period: Long, block: () -> Boolean) = launch {
+fun launchRepeatingTask(delay: Long = 0, period: Long, block: () -> Boolean) = decouple {
     try {
         Thread.sleep(delay)
         while (block()) {

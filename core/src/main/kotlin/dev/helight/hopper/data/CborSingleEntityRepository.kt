@@ -25,4 +25,5 @@ object CborSingleEntityRepository {
         if (!file.exists()) file.createNewFile()
         file.writeBytes(Cbor.encodeToByteArray(value))
     }
+
 }
