@@ -13,6 +13,7 @@ import kotlin.math.ceil
 class MessageBuilder(
     var value: TextComponent = TextComponent(),
     var lineLength: Int = 80,
+    val tabLength: Int = 4,
     var context: MessageContext = MessageContext(),
     block: MessageBuilder.() -> Unit,
 ) {
@@ -24,6 +25,9 @@ class MessageBuilder(
 
     val modifierReplaced
         get() = value.toLegacyText().replace("§", "&")
+
+    val tabValue
+        get() = " ".repeat(tabLength)
 
     init {
         block(this)
@@ -51,7 +55,7 @@ class MessageBuilder(
     }
 
     fun chatPrefix(string: String, color: String = "§c") {
-        this += "§r§8[§r$color$string§r§8]§r"
+        this += "§r§8[§r$color$string§r§8]§r "
     }
 
     fun clickable(string: String, eventValue: String, action: ClickEvent.Action = ClickEvent.Action.RUN_COMMAND, hover: String? = null,): MessageBuilder {
@@ -85,6 +89,11 @@ class MessageBuilder(
         val result = Chat.analyse(color + string)
         val spacing = ceil((lineLength - result.density) / 2).toInt()
         this += "§r" + " ".repeat(spacing) + color + string + "\n"
+    }
+
+    fun tab(): MessageBuilder {
+        this += tabValue
+        return this
     }
 
     fun reset(): MessageBuilder {
@@ -158,16 +167,13 @@ class MessageBuilder(
     }
 
     infix fun hex(color: String): MessageBuilder {
-        this += (TextComponent().apply {
-            this.color = net.md_5.bungee.api.ChatColor.of(color)
-        })
+        println(net.md_5.bungee.api.ChatColor.of(color).toString().replace("§", "&"))
+        add(net.md_5.bungee.api.ChatColor.of(color).toString())
         return this
     }
 
     infix fun hex(color: Color): MessageBuilder {
-        this += (TextComponent().apply {
-            this.color = net.md_5.bungee.api.ChatColor.of("#" + color.asRGB().toString(radix = 16))
-        })
+        add(net.md_5.bungee.api.ChatColor.of("#" + color.asRGB().toString(radix = 16)).toString())
         return this
     }
 

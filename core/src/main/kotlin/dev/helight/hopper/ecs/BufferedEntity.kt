@@ -1,16 +1,16 @@
 package dev.helight.hopper.ecs
 
-import dev.helight.hopper.ExportedEntity
-import dev.helight.hopper.TagComponent
-import dev.helight.hopper.ecs
+import dev.helight.hopper.*
 import dev.helight.hopper.extensions.ComponentGroupExtensions.migrateTo
-import dev.helight.hopper.toKey
 
 class BufferedEntity(
-    var entity: ExportedEntity = ExportedEntity(ecs.newEntityId(), sortedSetOf(), mutableListOf())
+    var entity: ExportedEntity = ExportedEntity(ecs.newEntityId(), sortedSetOf(), mutableListOf()),
+    var hasMigrated: Boolean = false,
+    var changedComponents: MutableSet<ComponentID> = mutableSetOf()
 ) {
 
     inline fun <reified T> add(value: Any? = null) {
+        hasMigrated = true
         val id = T::class.java.toKey()
         val newGroup = sortedSetOf(*entity.second.toTypedArray(), id)
         val newData = entity.second.migrateTo(newGroup, entity.third, addition = listOf(id to value))
@@ -27,7 +27,9 @@ class BufferedEntity(
 
     inline fun <reified T> set(value: Any? = null) {
         if (contains<T>()) {
-            val index = entity.second.indexOf(T::class.java.toKey())
+            val component = T::class.java.toKey()
+            changedComponents.add(component)
+            val index = entity.second.indexOf(component)
             entity = entity.copy(third = entity.third.toMutableList().apply {
                 set(index, value)
             })
@@ -36,15 +38,36 @@ class BufferedEntity(
         }
     }
 
+    inline fun <reified T> updateEntity(value: Any? = null) {
+        if (contains<T>()) {
+            val component = T::class.java.toKey()
+            changedComponents.add(component)
+            val index = entity.second.indexOf(component)
+            entity = entity.copy(third = entity.third.toMutableList().apply {
+                set(index, value)
+            })
+        } else {
+            error("Component doesn't currently exist in the entity")
+        }
+    }
+
     inline fun <reified T> contains(): Boolean = entity.second.contains(T::class.java.toKey())
 
-    fun push() {
+    fun pushEntity() {
         ecs.push(entity)
     }
 
-    fun replace() = ecs.operation {
-        ecs.deleteEntity(entity.first)
-        ecs.push(entity)
+    fun replaceEntity() {
+        if (!hasMigrated) updateEntity()
+        ecs.storage.replaceEntity(entity)
+    }
+
+    fun updateEntity() {
+        if (hasMigrated) error("Can't update because the component groups has migrated")
+        changedComponents.forEach {
+            val index = entity.second.indexOf(it)
+            ecs.storage.updateComponent(entity.first, it, entity.third[index])
+        }
     }
 
     fun readWrapper() = ExportedEntityWrapper(entity)

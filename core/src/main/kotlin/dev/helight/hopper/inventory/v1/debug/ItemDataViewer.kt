@@ -8,8 +8,8 @@ import dev.helight.hopper.inventory.v1.annotation.NoGarbageCollection
 import dev.helight.hopper.inventory.v1.routes.PagedBarRoute
 import dev.helight.hopper.utilities.Chat
 import dev.helight.hopper.utilities.Persistence
+import org.apache.commons.lang.WordUtils
 import org.bukkit.Material
-import org.bukkit.craftbukkit.libs.org.apache.commons.lang3.text.WordUtils
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.LeatherArmorMeta

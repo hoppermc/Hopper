@@ -1,37 +1,32 @@
-package dev.helight.hopper.entity
+package dev.helight.hopper.ecs.craft
 
 import dev.helight.hopper.EntityId
 import dev.helight.hopper.ecs
-import dev.helight.hopper.ecs.ExportedEntityWrapper
 import dev.helight.hopper.ecs.data.ExportedEntitySnapshot
-import dev.helight.hopper.ecs.system.HopperSystem
-import dev.helight.hopper.ecs.system.HopperSystemOptions
-import dev.helight.hopper.toKey
 import dev.helight.hopper.utilities.Persistence.load
 import dev.helight.hopper.utilities.Persistence.store
 import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
-import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.entity.Entity
 import org.bukkit.util.BoundingBox
 import java.util.*
 
 @Serializable
-@SerialName("minecraft:entity")
-data class SpigotEntity(
+@SerialName("hopper:mob")
+data class EcsMob(
     val entityId: String,
 
     @Transient
     var eventPassed: Boolean = false
 ) {
+
     fun resolve(): Entity? {
         return getFast(entityId)
     }
 
     fun isCurrentlyLoaded(): Boolean {
         val resolved = getFast(entityId) ?: return false
-        println("Resolved successfully checking validity")
         return resolved.isValid
     }
 
@@ -46,10 +41,21 @@ data class SpigotEntity(
             }.toList()
         }
 
+        fun getGlobal(entityId: String): Entity? {
+            globalEntityCache.forEach { world ->
+                world.value.forEach {
+                    if (it.uniqueId.toString() == entityId) return it
+                }
+            }
+            println("Didn't find entity $entityId")
+            return null
+        }
+
         fun getFast(entityId: String): Entity? {
             val result = entityCache[entityId]
             if (result == null) {
-                val e = Bukkit.getEntity(UUID.fromString(entityId))
+                val e = getGlobal(entityId)
+                println("Found $e")
                 if (e == null || !e.isValid) entityCache[entityId] = EntityResult(false, null)
                 else entityCache[entityId] = EntityResult(true, e)
                 return getFast(entityId)
@@ -64,20 +70,16 @@ data class SpigotEntity(
 
         @ExperimentalUnsignedTypes
         fun delete(entityId: String) {
-            ecs.query(SpigotEntity::class.java).firstOrNull { it.get<SpigotEntity>().entityId == entityId }?.apply {
+            ecs.query(EcsMob::class.java).firstOrNull { it.get<EcsMob>().entityId == entityId }?.apply {
                 ecs.deleteEntity(this@apply.entityId)
             }
         }
 
-        fun forEntity(entity: Entity): SpigotEntity = SpigotEntity(entity.uniqueId.toString())
+        fun forEntity(entity: Entity): EcsMob = EcsMob(entity.uniqueId.toString())
 
         fun getHopper(entity: Entity): EntityId? {
             val id = entity.persistentDataContainer.load("HopperSpigotEntity") ?: return null
             return id.toULongOrNull()
-        }
-
-        fun setup(entity: Entity, se: SpigotEntity, entityId: EntityId) {
-            entity.persistentDataContainer.store("HopperSpigotEntity", entityId.toString())
         }
 
         @ExperimentalUnsignedTypes
@@ -90,9 +92,12 @@ data class SpigotEntity(
 
         @ExperimentalUnsignedTypes
         fun load(entity: Entity) {
-            val content = entity.persistentDataContainer.load("EcsSnapshot")!!
+            val content = entity.persistentDataContainer.load("EcsSnapshot") ?: run {
+                println("Skipping load because no snapshot is present")
+                return
+            }
             val exported = ExportedEntitySnapshot.toExported(Json.decodeFromString(content))
-            println("Snapshot Loading ${exported.first}")
+            println("Snapshot Loading Entity ${exported.first}")
             ecs.push(exported)
         }
     }
@@ -103,15 +108,3 @@ data class EntityResult(
     val entity: Entity? = null
 )
 
-@ExperimentalUnsignedTypes
-class SpigotEntitySystem : HopperSystem(sortedSetOf(SpigotEntity::class.java.toKey()), HopperSystemOptions(isTicking = true)) {
-
-    override fun tickIndividual(wrapper: ExportedEntityWrapper) {
-        val entityComponent = wrapper.get<SpigotEntity>()
-        if (entityComponent.isCurrentlyLoaded()) {
-            println("System ticking for ${entityComponent.entityId}")
-        } else {
-            println("Entity ${entityComponent.entityId} is not loaded")
-        }
-    }
-}

@@ -1,9 +1,7 @@
 package dev.helight.hopper.extensions
 
-import dev.helight.hopper.ComponentData
-import dev.helight.hopper.ComponentGroup
-import dev.helight.hopper.ComponentID
-import dev.helight.hopper.EntityId
+import dev.helight.hopper.*
+import java.util.*
 
 object ComponentGroupExtensions {
     fun ComponentGroup.migrateTo(other: ComponentGroup, data: List<ComponentData>, addition: List<Pair<ComponentID, ComponentData>>): MutableList<ComponentData> {
@@ -38,4 +36,8 @@ object ComponentGroupExtensions {
             id to out
         }.toList()
     }
+
+    fun Collection<Class<*>>.componentGroup(): ComponentGroup = TreeSet(this.map {
+        it.toKey()
+    })
 }

@@ -73,15 +73,31 @@ data class Archetype(
         return currentData
     }
 
-    fun update(entityId: EntityId, componentID: ComponentID, value: ComponentData) {
+    fun update(entityId: EntityId, componentID: ComponentID, value: ComponentData): Boolean {
         w.lock()
         try {
             val index = ids.indexOf(entityId)
+            if (index == -1) return false
             val componentIndex = componentIndex(componentID)
             data[index][componentIndex] = value
         } finally {
             w.unlock()
         }
+        return true
+    }
+
+    fun transform(entityId: EntityId, componentID: ComponentID, transformer: ComponentTransformer): Boolean {
+        w.lock()
+        try {
+            val index = ids.indexOf(entityId)
+            if (index == -1) return false
+            val componentIndex = componentIndex(componentID)
+            val before = data[index][componentIndex]
+            data[index][componentIndex] = transformer(entityId,componentID,before)
+        } finally {
+            w.unlock()
+        }
+        return true
     }
 
     fun get(entityId: EntityId, componentID: ComponentID): ComponentData {

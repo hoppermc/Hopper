@@ -38,6 +38,7 @@ class GroupedThreadFactory : ThreadFactory {
  */
 @HopperDsl
 fun synchronize(block: Runnable) {
+    if (hopper.isShutdown) return
     val future = CompletableFuture<Nothing>()
     Bukkit.getScheduler().runTask(HopperSpigotHook.plugin, Runnable {
         block.run()
@@ -48,6 +49,7 @@ fun synchronize(block: Runnable) {
 
 @HopperDsl
 fun synchronizeDecoupled(block: Runnable) {
+    if (hopper.isShutdown) return
     Bukkit.getScheduler().runTask(HopperSpigotHook.plugin, block)
 }
 

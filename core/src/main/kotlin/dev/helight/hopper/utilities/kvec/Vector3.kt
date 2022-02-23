@@ -2,6 +2,7 @@ package dev.helight.hopper.utilities.kvec
 
 import org.bukkit.util.Vector
 import kotlin.math.round
+import kotlin.math.sqrt
 
 class Vector3 {
 
@@ -29,6 +30,10 @@ class Vector3 {
         get() = Vector2(x, z)
     val bukkit: Vector
         get() = Vector(x, y, z)
+    val doubleTriple: Triple<Double, Double, Double>
+        get() = Triple(x, y, z)
+    val floatTriple: Triple<Float, Float, Float>
+        get() = Triple(x.toFloat(), y.toFloat(), z.toFloat())
 
     /**
      * Returns a new vector with the x/y/z values inverted.
@@ -45,7 +50,7 @@ class Vector3 {
      * @return normalized vector
      */
     fun normalize(): Vector3 {
-        val len = Math.sqrt(x * x + y * y + z * z)
+        val len = sqrt(x * x + y * y + z * z)
         return Vector3(x / len, y / len, z / len)
     }
 
@@ -58,6 +63,30 @@ class Vector3 {
 
     fun clone(): Vector3 {
         return Vector3(x, y, z)
+    }
+
+    operator fun plus(other: Vector3): Vector3 {
+        return Vector3(x + other.x, y + other.y, z + other.z)
+    }
+
+    operator fun minus(other: Vector3): Vector3 {
+        return Vector3(x - other.x, y - other.y, z - other.z)
+    }
+
+    operator fun times(other: Vector3): Vector3 {
+        return Vector3(x * other.x, y * other.y, z * other.z)
+    }
+
+    operator fun times(scalar: Double): Vector3 {
+        return Vector3(x * scalar, y * scalar, z * scalar)
+    }
+
+    operator fun div(other: Vector3): Vector3 {
+        return Vector3(x / other.x, y / other.y, z / other.z)
+    }
+
+    operator fun div(scalar: Double): Vector3 {
+        return Vector3(x / scalar, y / scalar, z / scalar)
     }
 
     override fun toString(): String {

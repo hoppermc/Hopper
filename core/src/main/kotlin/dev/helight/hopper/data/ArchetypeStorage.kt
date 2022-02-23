@@ -67,31 +67,62 @@ class ArchetypeStorage {
 
     fun addEntity(id: EntityId, group: ComponentGroup = sortedSetOf(), data: MutableList<ComponentData> = mutableListOf()) {
         w.lock()
-        globalEntityList.add(id)
-        w.unlock()
-        if (data.size != group.size) {
-            for (i: Int in 0 until group.size) {
-                data.add(null)
+        try {
+            globalEntityList.add(id)
+            if (data.size != group.size) {
+                for (i: Int in 0 until group.size) {
+                    data.add(null)
+                }
             }
+            getArchetype(group).push(id, data)
+        } finally {
+            w.unlock()
         }
-        getArchetype(group).push(id, data)
     }
 
     fun removeEntity(entityId: EntityId): ExportedEntity? {
         w.lock()
         globalEntityList.remove(entityId)
-        w.unlock()
-        for (archetype in mappedArchetypes.values) {
-            val export = archetype.pop(entityId)
-            if (export != null) {
-                return export
+        try {
+            for (archetype in mappedArchetypes.values) {
+                val export = archetype.pop(entityId)
+                if (export != null) {
+                    return export
+                }
             }
+        } finally {
+            w.unlock()
         }
         return null
     }
 
-    fun peekAll(componentGroup: ComponentGroup): List<ExportedEntity> = queryEntityIds(*componentGroup.toULongArray()).mapNotNull {
-        getEntity(it.first)
+    fun replaceEntity(exportedEntity: ExportedEntity) {
+        w.lock()
+        try {
+            var hasDeleted = false
+            for (archetype in mappedArchetypes.values) {
+                val export = archetype.pop(exportedEntity.first)
+                if (export != null) {
+                    hasDeleted = true
+                }
+            }
+            if (!hasDeleted) error("Can't replace entity ${exportedEntity.first} because it doesn't currently exist")
+            val newArchetype = getArchetype(exportedEntity.second)
+            newArchetype.push(exportedEntity.first, exportedEntity.third)
+        } finally {
+            w.unlock()
+        }
+    }
+
+    fun peekAll(componentGroup: ComponentGroup): List<ExportedEntity> {
+        r.lock()
+        return try {
+            queryEntityIds(*componentGroup.toULongArray()).mapNotNull {
+                getEntity(it.first)
+            }
+        } finally {
+            r.unlock()
+        }
     }
 
     fun removeAll(componentGroup: ComponentGroup): List<ExportedEntity> = queryEntityIds(*componentGroup.toULongArray()).mapNotNull {
@@ -99,34 +130,70 @@ class ArchetypeStorage {
     }
 
     fun addComponent(id: EntityId, componentID: ComponentID, value: ComponentData) {
-        val (_, group, data) = removeEntity(id)!!
-        val newGroup = TreeSet(group)
-        newGroup.add(componentID)
-        val newData = group.migrateTo(newGroup, data, listOf(
-            componentID to value
-        )).toMutableList()
-        addEntity(id,newGroup, newData)
+        w.lock()
+        try {
+            val (_, group, data) = removeEntity(id)!!
+            val newGroup = TreeSet(group)
+            newGroup.add(componentID)
+            val newData = group.migrateTo(newGroup, data, listOf(
+                componentID to value
+            )).toMutableList()
+            addEntity(id,newGroup, newData)
+        } finally {
+            w.unlock()
+        }
     }
 
     fun updateComponent(id: EntityId, componentID: ComponentID, value: ComponentData) {
-        val (_, group, _) = getEntity(id)!!
-        mappedArchetypes[group]!!.update(id, componentID, value)
+        r.lock()
+        try {
+            var updated = false
+            mappedArchetypes.forEach {
+                if (it.value.update(id, componentID, value)) updated = true
+            }
+            if (!updated) error("No archetype contained an entity with the id $id")
+        } finally {
+            r.unlock()
+        }
+    }
+
+    fun transformComponent(id: EntityId, componentID: ComponentID, transformer: ComponentTransformer) {
+        r.lock()
+        try {
+            var updated = false
+            mappedArchetypes.forEach {
+                if (it.value.transform(id, componentID, transformer)) updated = true
+            }
+            if (!updated) error("No archetype contained an entity with the id $id")
+        } finally {
+            r.unlock()
+        }
     }
 
     fun removeComponent(id: EntityId, componentID: ComponentID) {
-        val (_, group, data) = removeEntity(id)!!
-        val newGroup = TreeSet(group)
-        newGroup.remove(componentID)
-        val newData = group.migrateTo(newGroup, data, listOf()).toMutableList()
-        addEntity(id,newGroup, newData)
+        w.lock()
+        try {
+            val (_, group, data) = removeEntity(id)!!
+            val newGroup = TreeSet(group)
+            newGroup.remove(componentID)
+            val newData = group.migrateTo(newGroup, data, listOf()).toMutableList()
+            addEntity(id,newGroup, newData)
+        } finally {
+            w.unlock()
+        }
     }
 
     fun getEntity(entityId: EntityId): ExportedEntity? {
-        for (archetype in mappedArchetypes.values) {
-            val export = archetype.export(entityId)
-            if (export != null) {
-                return export
+        r.lock()
+        try {
+            for (archetype in mappedArchetypes.values) {
+                val export = archetype.export(entityId)
+                if (export != null) {
+                    return export
+                }
             }
+        } finally {
+            r.unlock()
         }
         return null
     }
@@ -141,17 +208,37 @@ class ArchetypeStorage {
         }
     }
 
-    fun queryEntities(group: ComponentGroup) = queryArchetypes(*group.toULongArray()).flatMap { archetype ->
-        archetype.group.migrateMultipleDown(group, archetype.all())
+    fun queryEntities(group: ComponentGroup): List<Pair<EntityId, MutableList<ComponentData>>> {
+        r.lock()
+        return try {
+            queryArchetypes(*group.toULongArray()).flatMap { archetype ->
+                archetype.group.migrateMultipleDown(group, archetype.all())
+            }
+        } finally {
+            r.unlock()
+        }
     }
 
-    fun queryEntitiesExpanded(group: ComponentGroup) = queryArchetypes(*group.toULongArray()).flatMap(Archetype::all)
+    fun queryEntitiesExpanded(group: ComponentGroup): List<ExportedEntity> {
+        r.lock()
+        return try {
+            queryArchetypes(*group.toULongArray()).flatMap { archetype ->
+                archetype.all().map {
+                    ExportedEntity(it.first, archetype.group, it.second)
+                }
+            }
+        } finally {
+            r.unlock()
+        }
+    }
 
     fun containsEntity(id: EntityId): Boolean {
         r.lock()
-        val value = globalEntityList.contains(id)
-        r.unlock()
-        return value
+        return try {
+            globalEntityList.contains(id)
+        } finally {
+            r.unlock()
+        }
     }
 
     companion object {

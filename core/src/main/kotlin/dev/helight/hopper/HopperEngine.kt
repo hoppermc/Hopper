@@ -18,18 +18,46 @@ import org.quartz.impl.StdSchedulerFactory
 import java.util.*
 import kotlin.reflect.KClass
 
+/**
+ * Java class derived id for a component class or tag.
+ */
 typealias ComponentID = ULong
-typealias EntityId = ULong
 
-typealias RegistryID = UUID
+/**
+ * Pseudo-Random id either generated as a snowflake or
+ * through an incremental counter.
+ */
+typealias EntityId = ULong
 
 typealias TypeGroup = List<Class<*>>
 
+/**
+ * Sorted set of component ids, used as a key for [Archetypes][dev.helight.hopper.data.Archetype]
+ * and all connected systems.
+ */
 typealias ComponentGroup = TreeSet<ComponentID>
+
 typealias ComponentData = Any?
+
 typealias FilledComponent = Pair<ComponentID, ComponentData>
+
 typealias AssociatedEntity = Pair<EntityId, Archetype>
+
+/**
+ * All necessary data to import/export data from/to [Archetypes][dev.helight.hopper.data.Archetype]
+ */
 typealias ExportedEntity = Triple<EntityId, ComponentGroup, MutableList<ComponentData>>
+
+/**
+ * Component Transformers are a very critical part for **altering component values** in a reactive way
+ * **without losing state**. If multiple transformers want to modify a component at the same time,
+ * they will execute after one another, while an individual transformer is executing, the **archetype is write-locked**,
+ * which makes it very important to **minimize the execution time** as much as possible.
+ *
+ * @author HelightDev
+ * @sample dev.helight.hopper.ecs.craft.HealthAmountTransformer
+ */
+typealias ComponentTransformer = (EntityId, ComponentID, ComponentData) -> ComponentData
 
 @HopperDsl
 val ecs = HopperECS()
@@ -37,11 +65,18 @@ val ecs = HopperECS()
 @HopperDsl
 val hopper = HopperEngine()
 
+/**
+ * Marks a method as being part of hopper dsl.
+ */
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.FUNCTION, AnnotationTarget.FIELD)
 @DslMarker
 annotation class HopperDsl
 
+/**
+ * Can be used by plugins and codegenerators to generate onLoad hooks.
+ * Annotated classes will be constructed via a no-args constructor.
+ */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.CLASS)
 annotation class AnnotatedPluginRegistrant
@@ -70,17 +105,6 @@ annotation class TagComponent
 
 @TagComponent
 class TransientEntity {}
-
-class TransientComponentSerializer : ComponentSerializer {
-    override fun serialize(value: Any?): String {
-        return ""
-    }
-
-    override fun deserialize(data: String): Any? {
-        return TransientEntity()
-    }
-
-}
 
 
 class HopperSpigotHook : JavaPlugin() {
@@ -115,10 +139,12 @@ class HopperEngine {
     lateinit var mongoDatabase: CoroutineDatabase
 
     lateinit var spigot: HopperSpigot
+    var isShutdown = false
 
     val pluginLoader = HopperSuperClassLoader()
 
     fun start() {
+        isShutdown = false
         setupScheduler()
 
         coreConfiguration = ConfigurationSource.registry.findById("JsonFile")!!
@@ -154,20 +180,24 @@ class HopperEngine {
         }
     }
 
-    @HopperDsl
-    fun exampleDslFunction(block: HopperEngine.() -> Unit) {
-        block()
-    }
-
     fun schedule(job: JobDetail, trigger: Trigger) {
         scheduler.scheduleJob(job, trigger)
     }
 
     fun stop() {
+        isShutdown = true
         spigot.unhook()
         ecs.stop()
         scheduler.shutdown()
     }
+
+    fun getHighFrequencyTrigger(name: String, group: String): Trigger = newTrigger()
+        .startNow()
+        .withIdentity(name, group)
+        .withSchedule(SimpleScheduleBuilder.simpleSchedule()
+            .repeatForever()
+            .withIntervalInMilliseconds(40))
+        .build()
 
     fun getBukkitLikeTrigger(name: String, group: String): Trigger = newTrigger()
         .startNow()

@@ -6,7 +6,7 @@ import java.time.Instant
 
 
 /**
- * Fork of https://github.com/callicoder/java-snowflake/blob/master/src/main/java/com/callicoder/snowflake/Snowflake.java
+ * Forked from [Java-Snowflake](https://github.com/callicoder/java-snowflake/blob/master/src/main/java/com/callicoder/snowflake/Snowflake.java)
  */
 class Snowflake {
     private val nodeId: Long
@@ -17,9 +17,6 @@ class Snowflake {
     @Volatile
     private var sequence = 0L
 
-    // Create Snowflake with a nodeId and custom epoch
-    // Create Snowflake with a nodeId
-    @JvmOverloads
     constructor(nodeId: Long) {
         require(!(nodeId < 0 || nodeId > maxNodeId)) { String.format("NodeId must be between %d and %d", 0, maxNodeId) }
         this.nodeId = nodeId
@@ -37,23 +34,19 @@ class Snowflake {
         if (currentTimestamp == lastTimestamp) {
             sequence = sequence + 1 and maxSequence
             if (sequence == 0L) {
-                // Sequence Exhausted, wait till next millisecond.
                 currentTimestamp = waitNextMillis(currentTimestamp)
             }
         } else {
-            // reset sequence to start with zero for the next millisecond
             sequence = 0
         }
         lastTimestamp = currentTimestamp
         return (currentTimestamp shl NODE_ID_BITS + SEQUENCE_BITS or (nodeId shl SEQUENCE_BITS) or sequence)
     }
 
-    // Get current timestamp in milliseconds, adjust for the custom epoch.
     private fun timestamp(): Long {
         return Instant.now().toEpochMilli() - customEpoch
     }
 
-    // Block and wait till next millisecond
     private fun waitNextMillis(timestamp: Long): Long {
         var currentTimestamp = timestamp
         while (currentTimestamp == lastTimestamp) {
@@ -99,7 +92,7 @@ class Snowflake {
     }
 
     companion object {
-        private const val UNUSED_BITS = 1 // Sign bit, Unused (always set to 0)
+        private const val UNUSED_BITS = 1
         private const val EPOCH_BITS = 41
         private const val NODE_ID_BITS = 10
         private const val SEQUENCE_BITS = 12
@@ -107,8 +100,6 @@ class Snowflake {
         private const val maxNodeId = (1L shl NODE_ID_BITS) - 1
         private const val maxSequence = (1L shl SEQUENCE_BITS) - 1
 
-        // Hopper Epoch (August 19, 2021 Midnight GMT = 02:00:00 GMT+02:00)
-        // The date I came up with the idea of using Snowflakes as EntityIds
         private const val customEpoch = 1629331200000L
     }
 }

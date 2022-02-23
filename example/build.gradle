@@ -1,7 +1,7 @@
 plugins {
-    id 'org.jetbrains.kotlin.jvm' version '1.5.30'
-    id 'org.jetbrains.kotlin.plugin.serialization' version '1.5.30'
-    id "org.jetbrains.kotlin.kapt" version "1.5.30"
+    id 'org.jetbrains.kotlin.jvm' version '1.6.10'
+    id 'org.jetbrains.kotlin.plugin.serialization' version '1.6.10'
+    id "org.jetbrains.kotlin.kapt" version "1.6.10"
 }
 
 group = 'dev.helight.hopper'
@@ -13,8 +13,8 @@ repositories {
 }
 
 dependencies {
-    implementation 'dev.helight.hopper:hopper-core:1.0.1'
-    kapt 'dev.helight.hopper:hopper-kapt:1.0.0'
+    implementation 'dev.helight.hopper:hopper-core:1.0.3'
+    // kapt 'dev.helight.hopper:hopper-kapt:1.0.0'
 }
 
 kapt {

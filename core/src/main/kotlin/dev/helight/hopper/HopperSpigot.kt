@@ -5,30 +5,33 @@ import de.slikey.effectlib.EffectManager
 import dev.helight.hopper.api.BetterListener
 import dev.helight.hopper.commands.HopperEngineCommand
 import dev.helight.hopper.ecs.BufferedEntity
-import dev.helight.hopper.ecs.ComponentSerializer
-import dev.helight.hopper.ecs.ExportedEntityWrapper
 import dev.helight.hopper.ecs.craft.*
-import dev.helight.hopper.ecs.event.Event
-import dev.helight.hopper.ecs.event.HopperEvent
-import dev.helight.hopper.ecs.event.HopperEventHandler
-import dev.helight.hopper.ecs.system.HopperSystem
-import dev.helight.hopper.entity.SpigotEntity
-import dev.helight.hopper.entity.SpigotEntitySystem
+import dev.helight.hopper.ecs.craft.listeners.EntityEngineListener
+import dev.helight.hopper.ecs.craft.listeners.HealthEngineListener
+import dev.helight.hopper.ecs.craft.listeners.ItemEngineListener
+import dev.helight.hopper.ecs.craft.listeners.PlayerEngineListener
+import dev.helight.hopper.ecs.craft.systems.EcsEntitySystem
+import dev.helight.hopper.ecs.craft.systems.HopperHealthMobSystem
+import dev.helight.hopper.ecs.craft.systems.HopperHealthPlayerSystem
+import dev.helight.hopper.ecs.craft.systems.HopperRegenSystem
+import dev.helight.hopper.ecs.impl.DebugComponentSystem
+import dev.helight.hopper.ecs.impl.DebugEventHandler
+import dev.helight.hopper.ecs.impl.components.*
+import dev.helight.hopper.ecs.impl.jobs.ItemJob
+import dev.helight.hopper.ecs.impl.jobs.MaxHealthReevaluationJob
+import dev.helight.hopper.ecs.impl.jobs.RegenReevaluationJob
+import dev.helight.hopper.ecs.impl.serializers.*
 import dev.helight.hopper.extensions.EntityExtensions.living
 import dev.helight.hopper.inventory.v1.GuiEventListener
 import dev.helight.hopper.inventory.v1.GuiGarbageCollector
+import dev.helight.hopper.puppetboy.PuppetBoy
+import dev.helight.hopper.utilities.Persistence.store
 import kotlinx.coroutines.coroutineScope
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import kotlinx.coroutines.runBlocking
 import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.entity.Entity
 import org.bukkit.entity.EntityType
-import org.bukkit.event.HandlerList
-import org.bukkit.event.entity.EntityEvent
 import org.bukkit.inventory.ItemStack
 import org.quartz.JobBuilder.newJob
 import java.io.File
@@ -36,20 +39,30 @@ import java.net.URI
 import java.util.*
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.collections.set
 
 @Suppress("EXPERIMENTAL_API_USAGE")
 class HopperSpigot {
-
-
     lateinit var commandManager: PaperCommandManager
     lateinit var effectManager: EffectManager
     lateinit var proto: ProtoLibHook
+    lateinit var puppetBoy: PuppetBoy
 
     internal fun hookSerializers() {
-        ecs.serializer<TransientEntity>(TransientComponentSerializer())
-        ecs.serializer<SpigotEntity>(EntitySerializer())
-        ecs.serializer<SpigotItem>(SpigotItemSerializer())
+        ecs.registerDefaultSerializerForClass<TransientEntity>()
+        ecs.registerDefaultSerializerForClass<RollingMetaStorage>()
+        ecs.registerDefaultSerializerForClass<ActiveWearable>()
+
+        ecs.serializer<EcsMob>(EntitySerializer())
+        ecs.serializer<EcsItem>(SpigotItemSerializer())
+        ecs.serializer<EcsPlayer>(SpigotPlayerSerializer())
         ecs.serializer<DebugComponent>(DebugComponentSerializer())
+        ecs.serializer<BagComponent>(BagComponentSerializer())
+        ecs.serializer<HopperDamage>(HopperDamageSerializer())
+        ecs.serializer<HopperHealth>(HopperHealthSerializer())
+        ecs.serializer<HopperRegen>(HopperRegenSerializer())
+        ecs.serializer<IncreaseMaxHealth>(IncreaseMaxHealthSerializer())
+        ecs.serializer<IncreaseRegenRate>(IncreaseRegenRateSerializer())
     }
 
     fun isProtocolLibDownloaded(): Boolean = try {
@@ -60,7 +73,6 @@ class HopperSpigot {
     }
 
     internal fun hook() {
-
         if (!isProtocolLibDownloaded()) {
             println("Protocol Lib is not loaded")
             val file = File("plugins", "ProtocolLib.jar")
@@ -81,9 +93,18 @@ class HopperSpigot {
         commandManager = PaperCommandManager(HopperSpigotHook.plugin)
         effectManager = EffectManager(HopperSpigotHook.plugin)
 
+        puppetBoy = PuppetBoy(HopperSpigotHook.plugin)
+
         Bukkit.getScheduler().runTaskTimer(HopperSpigotHook.plugin, Runnable {
             Bukkit.getWorlds().forEach {
-                SpigotEntity.globalEntityCache[it.name] = it.entities
+                val before = EcsMob.globalEntityCache[it.name]
+                val after = it.entities
+                EcsMob.globalEntityCache[it.name] = after
+                if (before == null) {
+                    after.forEach(::checkLoadEntity)
+                } else {
+                    after.filterNot { entity -> before.contains(entity) }.forEach(::checkLoadEntity)
+                }
             }
         }, 0, 1)
 
@@ -91,33 +112,63 @@ class HopperSpigot {
 
         BetterListener.assureRegistered(EntityEngineListener::class.java)
         BetterListener.assureRegistered(ItemEngineListener::class.java)
+        BetterListener.assureRegistered(PlayerEngineListener::class.java)
+        BetterListener.assureRegistered(HealthEngineListener::class.java)
 
-        ecs.system<SpigotEntitySystem>()
+        ecs.system<EcsEntitySystem>()
         ecs.system<DebugComponentSystem>()
+        ecs.system<HopperHealthPlayerSystem>()
+        ecs.system<HopperHealthMobSystem>()
+        ecs.system<HopperRegenSystem>()
 
         ecs.handler<DebugEventHandler>()
+        ecs.handler<IncreaseRegenReevaluateHandler>()
+        ecs.handler<IncreaseMaxHealthReevaluateHandler>()
+        ecs.handler<ExtendHealthItemInfo>()
+
+        ecs.directEvents.register(BagHandler())
 
         hopper.schedule(newJob(ItemJob::class.java)
             .withIdentity("itemJob", "hopper")
             .build(), hopper.getPerSecondTrigger("itemJobTrigger", "hopper"))
 
+        hopper.schedule(newJob(MaxHealthReevaluationJob::class.java)
+            .withIdentity("maxHealthReevaluateJob", "hopper")
+            .build(), hopper.getPerSecondTrigger("maxHealthReevaluateJobTrigger", "hopper"))
+
+        hopper.schedule(newJob(RegenReevaluationJob::class.java)
+            .withIdentity("regenReevaluateJob", "hopper")
+            .build(), hopper.getPerSecondTrigger("regenReevaluateJobTrigger", "hopper"))
+
+
         commandManager.registerCommand(HopperEngineCommand())
     }
 
+    private fun checkLoadEntity(entity: Entity) = try {
+        val hopperID = EcsMob.getHopper(entity)
+        if (hopperID != null) {
+            println("Confirmed as hopper entity ${entity.entityId}. Loading.")
+            EcsMob.load(entity)
+        } else {}
+    } catch (ex: Exception) {
+        ex.printStackTrace()
+    }
+
+
     internal fun unhook() {
-        ecs.query(SpigotEntity::class.java).forEach {
-            val se = it.get<SpigotEntity>()
-            val entity = se.resolve()
-            if (entity != null) SpigotEntity.store(entity, it.entityId)
+        ecs.query(EcsMob::class.java).forEach {
+            val se = it.get<EcsMob>()
+            val entity = runBlocking { se.resolve() }
+            if (entity != null) EcsMob.store(entity, it.entityId)
         }
 
-        val items = ecs.query(SpigotItem::class.java)
+        val items = ecs.query(EcsItem::class.java)
         val latch = CountDownLatch(items.size)
         items.forEach {
-            val si = it.get<SpigotItem>()
+            val si = it.get<EcsItem>()
             println(si)
             val item = si.getHolder()?.inventory?.first { item ->
-                val hopper = SpigotItem.getHopper(item)
+                val hopper = EcsItem.getHopper(item)
                 hopper != null && hopper == it.entityId
             }
             when(item) {
@@ -126,7 +177,7 @@ class HopperSpigot {
                     println("Item is not in inventory of assigned holder => Skipping store")
                 }
                 else -> offstageAsync {
-                    SpigotItem.store(item, it.entityId)
+                    EcsItem.store(item, it.entityId)
                     latch.countDown()
                 }
             }
@@ -144,41 +195,51 @@ class HopperSpigot {
         )
     }
 
+    fun spawnEntity(location: Location, type: EntityType, block: BufferedEntity.() -> Unit = {}): EntityId {
+        val hopperId = ecs.newEntityId()
 
-    fun spawnEntity(location: Location, type: EntityType): EntityId {
-        val spigot = location.world!!.spawnEntity(location, type)
-        val se = SpigotEntity.forEntity(spigot)
-        val hopperId = ecs.createEntityWithOperation()
-        ecs.add<SpigotEntity>(hopperId, se)
-        spigot.isPersistent = true
-        spigot.living?.removeWhenFarAway = false
+        synchronizeDecoupled {
+            val spigot = location.world!!.spawnEntity(location, type)
+            spigot.persistentDataContainer.store("HopperSpigotEntity", hopperId.toString())
+            val mob = EcsMob.forEntity(spigot)
+            val living = spigot.living!!
 
-        SpigotEntity.setup(spigot, se, hopperId)
+            val buffer = BufferedEntity()
+            buffer.entity = buffer.entity.copy(first = hopperId)
+            buffer.tag<TransientEntity>()
+            buffer.add<EcsMob>(mob)
+            buffer.add<HopperHealth>(HopperHealth(living.health, living.maxHealth, living.maxHealth))
+            block(buffer)
+            ecs.push(buffer.entity)
+
+            spigot.isPersistent = true
+            spigot.living?.removeWhenFarAway = false
+        }
 
         return hopperId
     }
 
     suspend fun createItem(item: ItemStack, block: suspend BufferedEntity.() -> Unit) = coroutineScope {
-        val si = SpigotItem(UUID.randomUUID().toString(), null)
+        val si = EcsItem(UUID.randomUUID().toString(), null)
         val entity = ecs.createSuspended {
             tag<TransientEntity>()
-            add<SpigotItem>(si)
+            add<EcsItem>(si)
             block(this)
         }
 
         println(entity.toString())
-        SpigotItem.setup(item, si, entity.first)
-        SpigotItem.store(item, entity.first)
+        EcsItem.setup(item, si, entity.first)
+        EcsItem.store(item, entity.first)
     }
 
     suspend inline fun <reified T> addComponentToItem(item: ItemStack, data: ComponentData) {
-        val hopper = SpigotItem.getHopper(item) ?: error("Not an hopper item")
+        val hopper = EcsItem.getHopper(item) ?: error("Not an hopper item")
         if (ecs.storage.containsEntity(hopper)) {
             ecs.add<T>(hopper, data)
         } else {
-            SpigotItem.load(item)!!
+            EcsItem.load(item)!!
             ecs.add<T>(hopper, data)
-            SpigotItem.store(item, hopper)
+            EcsItem.store(item, hopper)
         }
     }
 
@@ -189,80 +250,3 @@ class HopperSpigot {
 
 }
 
-@Serializable
-@SerialName("hopper:debug")
-data class DebugComponent(
-    val name: String
-)
-
-@ExperimentalUnsignedTypes
-class DebugEventHandler : HopperEventHandler(HopperEvent::class) {
-    override suspend fun handle(event: ExportedEntityWrapper) {
-        println("Event '${event.data.first { it.second is Event }.second?.javaClass?.simpleName ?: "null"}' [${event.entityId}]")
-    }
-
-}
-
-@ExperimentalUnsignedTypes
-class DebugComponentSystem : HopperSystem(DebugComponent::class) {
-
-    override fun tickIndividual(entity: ExportedEntityWrapper) {
-        println(entity.toString())
-        val debug = entity.get<DebugComponent>()
-        println("Ticking '${debug.name}' [${entity.entityId}]")
-    }
-
-}
-
-class HopperEntityCreateEvent(val delegate: Entity, val hopperEntity: SpigotEntity) : EntityEvent(delegate) {
-    override fun getHandlers(): HandlerList = handlers
-
-    companion object {
-        val handlers = HandlerList()
-    }
-}
-
-class HopperEntitySpawnEvent(val delegate: Entity, val hopperEntity: SpigotEntity) : EntityEvent(delegate) {
-    override fun getHandlers(): HandlerList = handlers
-
-    companion object {
-        val handlers = HandlerList()
-    }
-}
-
-class HopperEntityDespawnEvent(val delegate: Entity, val hopperEntity: SpigotEntity) : EntityEvent(delegate) {
-    override fun getHandlers(): HandlerList = handlers
-
-    companion object {
-        val handlers = HandlerList()
-
-    }
-}
-
-class HopperEntityDestroyEvent(val delegate: Entity, val hopperEntity: SpigotEntity) : EntityEvent(delegate) {
-    override fun getHandlers(): HandlerList = handlers
-
-    companion object {
-        val handlers = HandlerList()
-    }
-}
-
-class EntitySerializer: ComponentSerializer {
-    override fun serialize(value: Any?): String {
-        return Json.encodeToString(value as SpigotEntity)
-    }
-
-    override fun deserialize(data: String): Any {
-        return Json.decodeFromString<SpigotEntity>(data)
-    }
-}
-
-class DebugComponentSerializer: ComponentSerializer {
-    override fun serialize(value: Any?): String {
-        return Json.encodeToString(value as DebugComponent)
-    }
-
-    override fun deserialize(data: String): Any {
-        return Json.decodeFromString<DebugComponent>(data)
-    }
-}

@@ -53,6 +53,7 @@ data class ExportedEntitySnapshot(
             val group = TreeSet(snapshot.group.split("-").map { it.toULong() })
             return Triple(snapshot.id, group, snapshot.data.mapIndexed { index, it ->
                 val id = group.toList()[index]
+                println("Deserializing id $id")
                 ecs.serializers[id]!!.deserialize(it)
             }.toMutableList())
         }

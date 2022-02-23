@@ -1,7 +1,7 @@
-package dev.helight.hopper.ecs.craft
+package dev.helight.hopper.ecs.craft.listeners
 
 import dev.helight.hopper.api.BetterListener
-import dev.helight.hopper.entity.SpigotEntity
+import dev.helight.hopper.ecs.craft.EcsMob
 import org.bukkit.event.EventHandler
 import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.world.ChunkLoadEvent
@@ -12,26 +12,32 @@ class EntityEngineListener : BetterListener() {
     @ExperimentalUnsignedTypes
     @EventHandler
     fun onChunkLoad(event: ChunkLoadEvent) {
+        // This still doesn't work in 1.17+ why the f*ck isn't this getting fixed @md5 :3
+        /*
         if (!event.isNewChunk) {
-            for (entity in event.chunk.entities) {
-                SpigotEntity.invalidateEntity(entity)
-
-                val hopperID = SpigotEntity.getHopper(entity)
+            val entities = event.chunk.entities
+            entities.forEach { entity ->
+                EcsMob.invalidateEntity(entity)
+                val hopperID = EcsMob.getHopper(entity)
                 if (hopperID != null) {
-                    SpigotEntity.load(entity)
+                    println("Confirmed as hopper entity. Loading.")
+                    EcsMob.load(entity)
                 }
             }
         }
+        */
     }
 
     @EventHandler
     fun onChunkUnload(event: ChunkUnloadEvent) {
-        for (entity in event.chunk.entities) {
-            SpigotEntity.invalidateEntity(entity)
 
-            val hopperID = SpigotEntity.getHopper(entity)
+        for (entity in event.chunk.entities) {
+            EcsMob.invalidateEntity(entity)
+
+            val hopperID = EcsMob.getHopper(entity)
             if (hopperID != null) {
-                SpigotEntity.store(entity, hopperID)
+                println("Storing hopper entity mob")
+                EcsMob.store(entity, hopperID)
             }
         }
     }
@@ -59,8 +65,8 @@ class EntityEngineListener : BetterListener() {
 
     @EventHandler
     fun onEntityDeath(event: EntityDeathEvent) {
-        SpigotEntity.invalidateEntity(event.entity.uniqueId.toString())
-        SpigotEntity.delete(event.entity.uniqueId.toString())
+        EcsMob.invalidateEntity(event.entity.uniqueId.toString())
+        EcsMob.delete(event.entity.uniqueId.toString())
     }
 
 }

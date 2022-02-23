@@ -5,6 +5,7 @@ import com.google.gson.Gson
 import com.mojang.authlib.GameProfile
 import com.mojang.authlib.properties.Property
 import dev.helight.hopper.HopperSpigotHook
+import dev.helight.hopper.ecs.craft.listeners.ItemEngineListener
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.attribute.Attribute
@@ -66,6 +67,11 @@ class Item : ForwardingObject {
 
     fun lore(strings: Collection<String>): Item {
         this.changeMeta { itemMeta: ItemMeta -> itemMeta.lore = ArrayList(strings) }
+        return this
+    }
+
+    fun extLore(): Item {
+        this.changeMeta { itemMeta: ItemMeta -> itemMeta.lore = listOf(*((itemMeta.lore ?: listOf<String>()).toTypedArray()), ItemEngineListener.extCollapsedHeader) }
         return this
     }
 

@@ -2,5 +2,5 @@
   "id": "minigames-module",
   "mainClass": "dev.helight.hopper.minigames.Minigames",
   "namespace": "dev.helight.hopper.minigames",
-  "priority": "100"
+  "loadPriority": "100"
 }

@@ -16,7 +16,8 @@ class MongoCrudRepository<T: PersistentEntity>(val type: Class<T>) : SimpleCrudR
     }
 
     override suspend fun update(entity: T) {
-        mongoCollection.updateOneById(entity.id, entity)
+        val result = mongoCollection.updateOneById(entity.id, entity)
+        if (result.matchedCount == 0L) error("No matches (${entity.id})")
     }
 
     override suspend fun delete(entity: T) {

@@ -165,8 +165,6 @@ object Chat {
             false -> ""
         }
 
-        println("Density: $density")
-
         return MessageAnalyseResult(
             delegate = message,
             color = "§$color",
@@ -178,30 +176,33 @@ object Chat {
         )
     }
 
-    fun line(length: Int = 20, color: String? = null, center: String = "", prefix: String? = null, suffix: String? = null): String {
+    fun line(
+        length: Int = 20,
+        color: String? = null,
+        center: String = "",
+        prefix: String? = null,
+        suffix: String? = null
+    ): String {
         val centerResult = analyse(center)
         val freeSpace = length - centerResult.density
         val rawLeft = ceil(freeSpace / 2.0).toInt()
-        val left = when(prefix) {
+        val left = when (prefix) {
             null -> rawLeft
             else -> rawLeft - 1
         }
 
-        val right = when(suffix) {
+        val right = when (suffix) {
             null -> (freeSpace - rawLeft).toInt()
             else -> (freeSpace - rawLeft).toInt() - 1
         }
 
-        val linePrefix = "§r" + when(color) {
+        val linePrefix = "§r" + when (color) {
             null -> "§8"
             else -> "$color"
         } + "§m"
 
 
-
-        val value = (prefix ?: "") +  linePrefix + " ".repeat(left) + "§r" + center + linePrefix + " ".repeat(right) + (suffix ?: "")
-        println(value.replace("§", "&"))
-        return value
+        return (prefix ?: "") + linePrefix + " ".repeat(left) + "§r" + center + linePrefix + " ".repeat(right) + (suffix ?: "")
     }
 
     data class MessageAnalyseResult(
